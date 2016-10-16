@@ -1,0 +1,7 @@
+[package]
+name = "chainmail"
+version = "0.1.0"
+authors = ["Pocket7878 <poketo7878@gmail.com>"]
+
+[dependencies]
+iron = "0.4.*"
