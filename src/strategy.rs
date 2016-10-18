@@ -1,11 +1,16 @@
 use iron::prelude::*;
 use std::error::Error;
 use std::fmt;
-use std::any::Any;
 
 #[derive(Debug)]
 pub struct AuthError {
     msg: String
+}
+
+impl AuthError {
+    pub fn new(msg: &str) -> AuthError {
+        AuthError { msg: msg.to_owned() }
+    }
 }
 
 impl fmt::Display for AuthError {
@@ -25,6 +30,6 @@ impl Error for AuthError {
 }
 
 pub trait Strategy<U> {
-    fn is_valid(&self, req: &Request) -> bool;
+    fn is_valid(&self, req: &mut Request) -> bool;
     fn authenticate(&self, req: &mut Request) -> Result<U, AuthError>;
 }
