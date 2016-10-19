@@ -7,7 +7,7 @@ Strategy based authentication middleware for Iron framework.
 Add this line to `Cargo.toml`:
 
 ```TOML
-chainmail = { git = "https://github.com/pocket7878/chainmail.git" }
+chainmail = "0.1.0"
 ```
 
 ## Example
