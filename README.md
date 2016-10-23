@@ -114,4 +114,3 @@ fn main() {
 ## TODO
 
 - Support user serialize into session
-- Add option to force authorization before handler execute.
