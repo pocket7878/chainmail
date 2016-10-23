@@ -5,7 +5,7 @@ pub mod strategy;
 use strategy::Strategy;
 use std::collections::HashMap;
 use iron::prelude::*;
-use iron::{typemap, BeforeMiddleware, AfterMiddleware, Handler};
+use iron::{typemap, AroundMiddleware, Handler};
 use iron::status::Status;
 use std::any::Any;
 use std::sync::Arc;
@@ -19,8 +19,45 @@ pub struct ChainmailMiddleware<T>
     where T: Send + Any
 {
     strategies: HashMap<String, Arc<Box<Strategy<T> + Send + Sync>>>,
-    failure_handler: Option<Box<Handler>>,
-    intercept_401: bool,
+    pub failure_handler: Option<Box<Handler>>,
+    pub intercept_401: bool,
+    pub force: bool,
+}
+
+pub struct ChainmailHandler<T, H: Handler>
+    where T: Send + Any
+{
+    chainmail_middleware: ChainmailMiddleware<T>,
+    base_handler: H,
+}
+
+impl<T: Send + Any, H: Handler> Handler for ChainmailHandler<T, H> {
+    fn handle(&self, req: &mut Request) -> IronResult<Response> {
+        let auth_result: Option<AuthedUser<T>> = self.chainmail_middleware.auth(req);
+        if auth_result.is_none() && self.chainmail_middleware.force {
+            match self.chainmail_middleware.failure_handler {
+                Some(ref hn) => return hn.handle(req),
+                None => panic!("No failure handler"),
+            }
+        } else {
+            req.extensions.insert::<ChainmailMiddleware<T>>(Arc::new(auth_result));
+            let res = self.base_handler.handle(req);
+            match res {
+                Ok(resp) => {
+                    match resp.status {
+                        Some(Status::Unauthorized) if self.chainmail_middleware.intercept_401 => {
+                            match self.chainmail_middleware.failure_handler {
+                                Some(ref fhn) => fhn.handle(req),
+                                None => panic!("No failureHandler to intercept 401"),
+                            }
+                        }
+                        _ => Ok(resp),
+                    }
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
 }
 
 impl<T> typemap::Key for ChainmailMiddleware<T>
@@ -32,12 +69,14 @@ impl<T> typemap::Key for ChainmailMiddleware<T>
 impl<T> ChainmailMiddleware<T>
     where T: Send + Any
 {
-    pub fn new(strategies: HashMap<String, Arc<Box<Strategy<T> + Send + Sync>>>) -> ChainmailMiddleware<T> {
+    pub fn new(strategies: HashMap<String, Arc<Box<Strategy<T> + Send + Sync>>>)
+               -> ChainmailMiddleware<T> {
         ChainmailMiddleware {
             strategies: strategies,
             failure_handler: None,
-            intercept_401: false
-         }
+            intercept_401: false,
+            force: false,
+        }
     }
 
     pub fn auth(&self, req: &mut Request) -> Option<AuthedUser<T>> {
@@ -46,7 +85,7 @@ impl<T> ChainmailMiddleware<T>
                 Ok(u) => {
                     return Some(AuthedUser {
                         user: u,
-                        authed_by: st_name
+                        authed_by: st_name,
                     })
                 }
                 Err(_) => {}
@@ -56,24 +95,12 @@ impl<T> ChainmailMiddleware<T>
     }
 }
 
-impl<T: Send + Any + 'static> BeforeMiddleware for ChainmailMiddleware<T> {
-    fn before(&self, req: &mut Request) -> IronResult<()> {
-        let auth_result: Option<AuthedUser<T>> = self.auth(req);
-        req.extensions.insert::<ChainmailMiddleware<T>>(Arc::new(auth_result));
-        Ok(())
-    }
-}
-
-impl<T: Send + Any + 'static> AfterMiddleware for ChainmailMiddleware<T> {
-    fn after(&self, req: &mut Request, res: Response) -> IronResult<Response> {
-        match res.status {
-            Some(Status::Unauthorized) if self.intercept_401 =>
-                match self.failure_handler {
-                    Some(ref fhn) => fhn.handle(req),
-                    None => panic!("No failureHandler to intercept 401")
-                },
-            _ => Ok(res)
-        }
+impl<T: Send + Any + 'static> AroundMiddleware for ChainmailMiddleware<T> {
+    fn around(self, handler: Box<Handler>) -> Box<Handler> {
+        Box::new(ChainmailHandler {
+            chainmail_middleware: self,
+            base_handler: handler,
+        }) as Box<Handler>
     }
 }
 
@@ -85,7 +112,6 @@ pub trait ChainmailReqExt<T>
 }
 
 impl<'a, 'b, T: Send + Any + 'static> ChainmailReqExt<T> for Request<'a, 'b> {
-
     fn current_user(&self) -> Arc<Option<AuthedUser<T>>> {
         self.extensions.get::<ChainmailMiddleware<T>>().unwrap().clone()
     }
@@ -94,7 +120,7 @@ impl<'a, 'b, T: Send + Any + 'static> ChainmailReqExt<T> for Request<'a, 'b> {
         let cur_user: Arc<Option<AuthedUser<T>>> = self.current_user();
         match *cur_user {
             Some(_) => true,
-            None => false
+            None => false,
         }
     }
 }

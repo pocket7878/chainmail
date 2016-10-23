@@ -103,7 +103,7 @@ fn main() {
         pass: String::from("my_passwd")
     })));
     let chainmail_middleware = ChainmailMiddleware::new(strategy_map);
-    chain.link_before(chainmail_middleware);
+    chain.around(chainmail_middleware);
 
     println!("Listen on localhost:3000");
     Iron::new(chain).http("localhost:3000").unwrap();
