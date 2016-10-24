@@ -24,7 +24,7 @@ pub struct ChainmailMiddleware<T>
     pub force: bool,
 }
 
-pub struct ChainmailHandler<T, H: Handler>
+struct ChainmailHandler<T, H: Handler>
     where T: Send + Any
 {
     chainmail_middleware: ChainmailMiddleware<T>,
