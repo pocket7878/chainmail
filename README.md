@@ -7,7 +7,7 @@ Strategy based authentication middleware for Iron framework.
 Add this line to `Cargo.toml`:
 
 ```TOML
-chainmail = "0.1.0"
+chainmail = "0.2.0"
 ```
 
 ## Example
