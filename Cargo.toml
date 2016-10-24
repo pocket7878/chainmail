@@ -1,6 +1,6 @@
 [package]
 name = "chainmail"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Pocket7878 <poketo7878@gmail.com>"]
 description = "Strategy based authentication middleware for Iron framework"
 license = "MIT/Apache-2.0"
